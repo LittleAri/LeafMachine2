@@ -25,10 +25,14 @@ from leafmachine2.machine.binarize_image_ML import run_binarize
 from leafmachine2.machine.LM2_logger import start_logging
 from leafmachine2.machine.utils_ruler import convert_rulers_testing, parallel_convert_rulers
 from leafmachine2.machine.fetch_data import fetch_data
+import numpy as np
+import datetime
 
 # @profile
-def machine(cfg_file_path, dir_home, cfg_test, progress_report=None):
+def machine(cfg_file_path, dir_home, cfg_test, numpy_path=None, save_numpy_only=True, progress_report=None):
     t_overall = perf_counter()
+
+    count_seg = 0
 
     # Load config file
     report_config(dir_home, cfg_file_path, system='LeafMachine2')
@@ -131,6 +135,7 @@ def machine(cfg_file_path, dir_home, cfg_test, progress_report=None):
             progress_report.set_n_batches(n_batches)
         print_main_start(m)
         
+        dt = str(datetime.datetime.now()).replace(' ','_')
 
         for batch in range(n_batches):
             if progress_report:
@@ -160,24 +165,32 @@ def machine(cfg_file_path, dir_home, cfg_test, progress_report=None):
                 do_seg = True # Need to know if segmentation has been added to Project[batch] for landmarks
                 if do_seg:
                     Project = segment_leaves(cfg, logger, dir_home, Project, batch, n_batches, Dirs)
-                    
+                    #################
+                    # ASJ EDIT BELOW
+                    #################
+                    if save_numpy_only:
+                        count_seg = count_seg+1
+                        np.save(numpy_path+'/'+dt+'_'+str(count_seg)+'.npy',Project.project_data_list)
 
-                # Landmarks Whole Leaves
-                if progress_report:
-                    progress_report.update_batch_part(f"Detecting Landmarks")
-                Project = detect_landmarks(cfg, logger, dir_home, Project, batch, n_batches, Dirs, do_seg)
-
-
+                #################
+                # ASJ EDIT BELOW
+                #################
+                # ASJ: Note that the following Armature code was already commented out.
                 # Landmarks Armature
                 # progress_report.update_batch_part(f"Detecting Armature Landmarks")
                 # Project = detect_armature(cfg, logger, dir_home, Project, batch, n_batches, Dirs, do_seg)
 
+                # Landmarks Whole Leaves
+                if save_numpy_only == False:
+                    if progress_report:
+                        progress_report.update_batch_part(f"Detecting Landmarks")
+                    Project = detect_landmarks(cfg, logger, dir_home, Project, batch, n_batches, Dirs, do_seg)
 
             # Custom Overlay 
-            if progress_report:
-                progress_report.update_batch_part(f"Saving Overlay Images")
-            build_custom_overlay_parallel(cfg, logger, dir_home, Project, batch, Dirs)
-
+            if save_numpy_only == False:
+                if progress_report:
+                    progress_report.update_batch_part(f"Saving Overlay Images")
+                build_custom_overlay_parallel(cfg, logger, dir_home, Project, batch, Dirs)
 
             # Export data to csv and json
             if progress_report:
